@@ -5,6 +5,7 @@ require("./jobs/monitoringJob");
 const applicationRoutes = require("./routes/applicationRoutes");
 const authRoutes = require("./routes/authRoutes");
 const monitoringRoutes = require("./routes/monitoringRoutes");
+const userRoutes = require("./routes/userRoutes");
 
 
 const app = express();
@@ -23,6 +24,7 @@ app.use(
 );
 app.use("/api/applications", applicationRoutes);
 app.use("/api/monitoring", monitoringRoutes);
+app.use("/api/users", userRoutes);
 
 // Test API Route
 app.get('/api/status', (req, res) => {

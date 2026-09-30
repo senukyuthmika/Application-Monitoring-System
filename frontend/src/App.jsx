@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler } from 'chart.js';
-import { Activity, Bell, CheckCircle2, FileText, LayoutDashboard, LogOut, PlayCircle, Server, ShieldAlert } from 'lucide-react';
+import { Activity, Bell, CheckCircle2, FileText, LayoutDashboard, LogOut, PlayCircle, Plus, Server, ShieldAlert, Trash2, Users } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
 
@@ -43,7 +43,20 @@ const demoLogs = [
   { log_id: 2, application_name: 'Admin Portal', log_level: 'INFO', message: 'Responded with status 200.', created_at: new Date().toISOString() },
 ];
 
+const demoUsers = [
+  { user_id: 1, name: 'System Admin', email: 'admin@gmail.com', role: 'ADMIN', created_at: new Date().toISOString() },
+  { user_id: 2, name: 'Monitoring User', email: 'user@gmail.com', role: 'USER', created_at: new Date().toISOString() },
+];
+
 const getToken = () => localStorage.getItem('token');
+const getUser = () => {
+  try {
+    return JSON.parse(localStorage.getItem('user'));
+  } catch {
+    return null;
+  }
+};
+const isAdmin = () => getUser()?.role === 'ADMIN';
 
 const apiRequest = async (path, options = {}) => {
   const token = getToken();
@@ -111,6 +124,7 @@ const Layout = () => (
         <nav className="grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
           <SidebarLink to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
           <SidebarLink to="/applications" icon={<Server size={18} />} label="Applications" />
+          <SidebarLink to="/users" icon={<Users size={18} />} label="Users" />
           <SidebarLink to="/alerts" icon={<Bell size={18} />} label="Alerts" />
           <SidebarLink to="/reports" icon={<FileText size={18} />} label="Reports" />
         </nav>
@@ -207,6 +221,16 @@ const Dashboard = () => {
 const Applications = () => {
   const { data, loading, error, reload } = useApiData('/applications', demoApplications);
   const [checkingId, setCheckingId] = useState(null);
+  const [form, setForm] = useState({
+    name: '',
+    description: '',
+    url: '',
+    type: 'Web App',
+    monitoring_interval: 60,
+    status: 'ACTIVE',
+  });
+  const [formMessage, setFormMessage] = useState('');
+  const [saving, setSaving] = useState(false);
 
   const runCheck = async (id) => {
     try {
@@ -220,22 +244,183 @@ const Applications = () => {
     }
   };
 
+  const createApplication = async (event) => {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      setFormMessage('');
+      await apiRequest('/applications', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...form,
+          monitoring_interval: Number(form.monitoring_interval),
+        }),
+      });
+      setForm({
+        name: '',
+        description: '',
+        url: '',
+        type: 'Web App',
+        monitoring_interval: 60,
+        status: 'ACTIVE',
+      });
+      setFormMessage('Application created successfully.');
+      await reload();
+    } catch (err) {
+      setFormMessage(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteApplication = async (id) => {
+    if (!window.confirm('Delete this application?')) return;
+
+    try {
+      await apiRequest(`/applications/${id}`, { method: 'DELETE' });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   return (
-    <section className="mx-auto max-w-7xl">
+    <section className="mx-auto max-w-7xl space-y-6">
       <PageHeader title="Applications" subtitle="Registered services and their monitoring configuration." />
       <Notice loading={loading} error={error} />
+      <AdminPanel title="Add Application" lockedMessage="Login as ADMIN to create monitored applications.">
+        <form onSubmit={createApplication} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2">
+          {formMessage && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700 lg:col-span-2">{formMessage}</div>}
+          <FormInput label="Application Name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
+          <FormInput label="Health Check URL" value={form.url} onChange={(value) => setForm({ ...form, url: value })} placeholder="http://localhost:3000/api/status" required />
+          <FormInput label="Description" value={form.description} onChange={(value) => setForm({ ...form, description: value })} />
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Type
+            <select className="rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-600" value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}>
+              <option>Web App</option>
+              <option>API</option>
+              <option>Database</option>
+              <option>Service</option>
+            </select>
+          </label>
+          <FormInput label="Monitoring Interval Seconds" type="number" min="10" value={form.monitoring_interval} onChange={(value) => setForm({ ...form, monitoring_interval: value })} required />
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Status
+            <select className="rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-600" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+              <option>ACTIVE</option>
+              <option>INACTIVE</option>
+            </select>
+          </label>
+          <div className="lg:col-span-2">
+            <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={saving}>
+              <Plus size={16} />
+              {saving ? 'Saving' : 'Add Application'}
+            </button>
+          </div>
+        </form>
+      </AdminPanel>
       <DataTable
-        columns={['Name', 'URL', 'Type', 'Interval', 'Status', '']}
+        columns={['Name', 'URL', 'Type', 'Interval', 'Status', 'Actions']}
         rows={data.map((app) => [
           app.name,
           <span className="break-all text-slate-500">{app.url}</span>,
           app.type || 'Web App',
           `${app.monitoring_interval || 60}s`,
           <StatusBadge status={app.status} />,
-          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={!getToken() || checkingId === app.application_id} onClick={() => runCheck(app.application_id)}>
-            <PlayCircle size={16} />
-            {checkingId === app.application_id ? 'Checking' : 'Check'}
-          </button>,
+          <div className="flex flex-wrap gap-2">
+            <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={!getToken() || checkingId === app.application_id} onClick={() => runCheck(app.application_id)}>
+              <PlayCircle size={16} />
+              {checkingId === app.application_id ? 'Checking' : 'Check'}
+            </button>
+            {isAdmin() ? <button className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" onClick={() => deleteApplication(app.application_id)}><Trash2 size={16} />Delete</button> : ''}
+          </div>,
+        ])}
+      />
+    </section>
+  );
+};
+
+const UsersPage = () => {
+  const { data, loading, error, reload } = useApiData('/users', demoUsers);
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    password: '',
+    role: 'USER',
+  });
+  const [formMessage, setFormMessage] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const createUser = async (event) => {
+    event.preventDefault();
+
+    try {
+      setSaving(true);
+      setFormMessage('');
+      await apiRequest('/users', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      setForm({
+        name: '',
+        email: '',
+        password: '',
+        role: 'USER',
+      });
+      setFormMessage('User created successfully.');
+      await reload();
+    } catch (err) {
+      setFormMessage(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteUser = async (id) => {
+    if (!window.confirm('Delete this user?')) return;
+
+    try {
+      await apiRequest(`/users/${id}`, { method: 'DELETE' });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <section className="mx-auto max-w-7xl space-y-6">
+      <PageHeader title="Users" subtitle="Create admin or normal user accounts for the monitoring system." />
+      <Notice loading={loading} error={error} />
+      <AdminPanel title="Create User" lockedMessage="Login as ADMIN to create users.">
+        <form onSubmit={createUser} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2">
+          {formMessage && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700 lg:col-span-2">{formMessage}</div>}
+          <FormInput label="Name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
+          <FormInput label="Email" type="email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} required />
+          <FormInput label="Password" type="password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} required />
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Role
+            <select className="rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-600" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
+              <option>USER</option>
+              <option>ADMIN</option>
+            </select>
+          </label>
+          <div className="lg:col-span-2">
+            <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={saving}>
+              <Plus size={16} />
+              {saving ? 'Saving' : 'Create User'}
+            </button>
+          </div>
+        </form>
+      </AdminPanel>
+      <DataTable
+        columns={['Name', 'Email', 'Role', 'Created', 'Actions']}
+        rows={data.map((user) => [
+          user.name,
+          user.email,
+          user.role,
+          formatDate(user.created_at),
+          isAdmin() ? <button className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50" onClick={() => deleteUser(user.user_id)}><Trash2 size={16} />Delete</button> : '',
         ])}
       />
     </section>
@@ -379,6 +564,37 @@ const DataTable = ({ columns, rows }) => (
   </div>
 );
 
+const AdminPanel = ({ title, lockedMessage, children }) => {
+  if (!isAdmin()) {
+    return (
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+        <span className="font-semibold">{title}: </span>
+        {lockedMessage}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <h3 className="mb-3 font-semibold text-slate-950">{title}</h3>
+      {children}
+    </div>
+  );
+};
+
+const FormInput = ({ label, value, onChange, type = 'text', ...props }) => (
+  <label className="grid gap-1 text-sm font-medium text-slate-700">
+    {label}
+    <input
+      className="rounded-lg border border-slate-300 px-3 py-2.5 outline-none focus:border-blue-600"
+      type={type}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+      {...props}
+    />
+  </label>
+);
+
 const Notice = ({ loading, error }) => {
   if (loading) return <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-700">Loading live monitoring data...</div>;
   if (error) return <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Showing demo data. Login and start the backend to load live data. Details: {error}</div>;
@@ -402,6 +618,7 @@ export default function App() {
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/applications" element={<Applications />} />
+          <Route path="/users" element={<UsersPage />} />
           <Route path="/alerts" element={<Alerts />} />
           <Route path="/reports" element={<Reports />} />
         </Route>

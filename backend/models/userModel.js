@@ -47,9 +47,40 @@ const findUserByEmail = async(email)=>{
 
 };
 
+const getUsers = async () => {
+
+    const result = await pool.query(
+        `
+        SELECT user_id, name, email, role, created_at
+        FROM users
+        ORDER BY user_id
+        `
+    );
+
+    return result.rows;
+
+};
+
+const deleteUser = async (id) => {
+
+    const result = await pool.query(
+        `
+        DELETE FROM users
+        WHERE user_id = $1
+        RETURNING user_id, name, email, role, created_at
+        `,
+        [id]
+    );
+
+    return result.rows[0];
+
+};
+
 
 
 module.exports = {
     createUser,
-    findUserByEmail
+    findUserByEmail,
+    getUsers,
+    deleteUser
 };
