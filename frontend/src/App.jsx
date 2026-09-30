@@ -1,163 +1,399 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Outlet } from 'react-router-dom';
+import React, { useEffect, useMemo, useState } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler } from 'chart.js';
-import { LayoutDashboard, Server, Bell, FileText, LogOut, Activity } from 'lucide-react';
+import { Activity, Bell, CheckCircle2, FileText, LayoutDashboard, LogOut, PlayCircle, Server, ShieldAlert } from 'lucide-react';
 
-// Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler);
 
-// --- COMPONENTS ---
+const API_URL = 'http://localhost:5000/api';
 
-// iOS-style Sidebar Layout
-const Layout = () => {
-  return (
-    <div className="flex h-screen bg-slate-50 font-sans">
-      {/* Sidebar */}
-      <aside className="w-64 bg-white/60 backdrop-blur-xl border-r border-slate-200/60 p-6 flex flex-col">
-        <div className="flex items-center gap-3 mb-10 text-blue-600">
-          <Activity size={28} />
-          <h1 className="text-xl font-bold tracking-tight text-slate-800">AppMonitor</h1>
-        </div>
-        
-        <nav className="flex-1 flex flex-col gap-2">
-          <SidebarLink to="/" icon={<LayoutDashboard size={20} />} label="Dashboard" />
-          <SidebarLink to="/applications" icon={<Server size={20} />} label="Applications" />
-          <SidebarLink to="/alerts" icon={<Bell size={20} />} label="Alerts" />
-          <SidebarLink to="/reports" icon={<FileText size={20} />} label="Reports" />
-        </nav>
-
-        <div className="pt-6 border-t border-slate-200/60">
-          <SidebarLink to="/login" icon={<LogOut size={20} />} label="Logout" />
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        <Outlet />
-      </main>
-    </div>
-  );
+const demoDashboard = {
+  total_applications: 3,
+  up_applications: 2,
+  down_applications: 1,
+  active_alerts: 1,
+  avg_response_time: 186,
+  response_time_chart: [
+    { label: '10:00', response_time: 120 },
+    { label: '10:10', response_time: 150 },
+    { label: '10:20', response_time: 290 },
+    { label: '10:30', response_time: 135 },
+    { label: '10:40', response_time: 160 },
+  ],
 };
 
+const demoApplications = [
+  { application_id: 1, name: 'Student Management System', url: 'http://localhost:3000', type: 'Web App', status: 'ACTIVE', monitoring_interval: 60 },
+  { application_id: 2, name: 'Admin Portal', url: 'https://example.com', type: 'Web App', status: 'ACTIVE', monitoring_interval: 60 },
+  { application_id: 3, name: 'Payment API', url: 'https://api.example.com/health', type: 'API', status: 'ACTIVE', monitoring_interval: 120 },
+];
+
+const demoAlerts = [
+  { alert_id: 1, application_name: 'Student Management System', severity: 'HIGH', status: 'OPEN', message: 'Application is unavailable.', created_at: new Date().toISOString() },
+];
+
+const demoHistory = [
+  { history_id: 1, application_name: 'Student Management System', status: 'DOWN', response_time: 5030, status_code: null, checked_at: new Date().toISOString() },
+  { history_id: 2, application_name: 'Admin Portal', status: 'UP', response_time: 143, status_code: 200, checked_at: new Date().toISOString() },
+];
+
+const demoLogs = [
+  { log_id: 1, application_name: 'Student Management System', log_level: 'ERROR', message: 'Health check failed.', created_at: new Date().toISOString() },
+  { log_id: 2, application_name: 'Admin Portal', log_level: 'INFO', message: 'Responded with status 200.', created_at: new Date().toISOString() },
+];
+
+const getToken = () => localStorage.getItem('token');
+
+const apiRequest = async (path, options = {}) => {
+  const token = getToken();
+  const response = await fetch(`${API_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || 'Request failed');
+  }
+
+  return response.json();
+};
+
+const useApiData = (path, fallback) => {
+  const [data, setData] = useState(fallback);
+  const [loading, setLoading] = useState(Boolean(getToken()));
+  const [error, setError] = useState('');
+
+  const load = async () => {
+    if (!getToken()) {
+      setData(fallback);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError('');
+      setData(await apiRequest(path));
+    } catch (err) {
+      setError(err.message);
+      setData(fallback);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    load();
+  }, [path]);
+
+  return { data, setData, loading, error, reload: load };
+};
+
+const Layout = () => (
+  <div className="min-h-screen bg-slate-50 text-slate-900 lg:flex">
+    <aside className="border-b border-slate-200 bg-white lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:border-b-0 lg:border-r">
+      <div className="flex h-full flex-col gap-6 p-5">
+        <div className="flex items-center gap-3 text-slate-900">
+          <div className="grid size-10 place-items-center rounded-lg bg-blue-600 text-white">
+            <Activity size={22} />
+          </div>
+          <div>
+            <h1 className="text-lg font-bold">AppMonitor</h1>
+            <p className="text-xs text-slate-500">Monitoring Console</p>
+          </div>
+        </div>
+        <nav className="grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
+          <SidebarLink to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
+          <SidebarLink to="/applications" icon={<Server size={18} />} label="Applications" />
+          <SidebarLink to="/alerts" icon={<Bell size={18} />} label="Alerts" />
+          <SidebarLink to="/reports" icon={<FileText size={18} />} label="Reports" />
+        </nav>
+        <div className="mt-auto">
+          <SidebarLink to="/login" icon={<LogOut size={18} />} label="Login" />
+        </div>
+      </div>
+    </aside>
+    <main className="flex-1 p-5 lg:p-8">
+      <Outlet />
+    </main>
+  </div>
+);
+
 const SidebarLink = ({ to, icon, label }) => (
-  <NavLink 
-    to={to} 
-    className={({ isActive }) => 
-      `flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 font-medium ${
-        isActive 
-          ? 'bg-blue-500 text-white shadow-md shadow-blue-500/20' 
-          : 'text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
+  <NavLink
+    to={to}
+    className={({ isActive }) =>
+      `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
+        isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
       }`
     }
   >
     {icon}
-    {label}
+    <span>{label}</span>
   </NavLink>
 );
 
-// --- PAGES ---
+const PageHeader = ({ title, subtitle }) => (
+  <div className="mb-6">
+    <h2 className="text-2xl font-bold tracking-tight text-slate-950">{title}</h2>
+    <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+  </div>
+);
+
+const MetricCard = ({ title, value, tone, icon }) => (
+  <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex items-start justify-between">
+      <span className="text-sm font-medium text-slate-500">{title}</span>
+      <span className={`grid size-9 place-items-center rounded-lg ${tone}`}>{icon}</span>
+    </div>
+    <div className="mt-5 text-3xl font-bold text-slate-950">{value}</div>
+  </div>
+);
+
+const StatusBadge = ({ status }) => {
+  const isHealthy = status === 'UP' || status === 'ACTIVE' || status === 'RESOLVED';
+  return (
+    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${isHealthy ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
+      {status || 'UNKNOWN'}
+    </span>
+  );
+};
 
 const Dashboard = () => {
-  const chartData = {
-    labels: ['10:00', '10:05', '10:10', '10:15', '10:20', '10:25', '10:30'],
+  const { data, loading, error } = useApiData('/monitoring/dashboard', demoDashboard);
+  const chartRows = data.response_time_chart || [];
+  const chartData = useMemo(() => ({
+    labels: chartRows.map((row) => row.label),
     datasets: [{
-      label: 'Avg Response Time (ms)',
-      data: [120, 135, 125, 250, 140, 130, 125],
-      borderColor: '#3b82f6',
-      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      label: 'Average response time',
+      data: chartRows.map((row) => row.response_time),
+      borderColor: '#2563eb',
+      backgroundColor: 'rgba(37, 99, 235, 0.12)',
       borderWidth: 3,
-      tension: 0.4, // Smooth curved line
+      tension: 0.35,
       fill: true,
-    }]
-  };
+    }],
+  }), [chartRows]);
 
-  const chartOptions = {
-    responsive: true,
-    plugins: { legend: { display: false } },
-    scales: {
-      y: { grid: { borderDash: [5, 5], color: '#e2e8f0' } },
-      x: { grid: { display: false } }
+  return (
+    <section className="mx-auto max-w-7xl">
+      <PageHeader title="System Overview" subtitle="Live availability, response time, and active alert status." />
+      <Notice loading={loading} error={error} />
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard title="Applications" value={data.total_applications} tone="bg-blue-50 text-blue-700" icon={<Server size={18} />} />
+        <MetricCard title="Healthy" value={data.up_applications} tone="bg-emerald-50 text-emerald-700" icon={<CheckCircle2 size={18} />} />
+        <MetricCard title="Down" value={data.down_applications} tone="bg-red-50 text-red-700" icon={<ShieldAlert size={18} />} />
+        <MetricCard title="Active Alerts" value={data.active_alerts} tone="bg-amber-50 text-amber-700" icon={<Bell size={18} />} />
+      </div>
+      <div className="mt-6 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <h3 className="font-semibold text-slate-950">Response Time Trend</h3>
+          <span className="text-sm text-slate-500">Average: {data.avg_response_time || 0} ms</span>
+        </div>
+        <div className="h-80">
+          <Line data={chartData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const Applications = () => {
+  const { data, loading, error, reload } = useApiData('/applications', demoApplications);
+  const [checkingId, setCheckingId] = useState(null);
+
+  const runCheck = async (id) => {
+    try {
+      setCheckingId(id);
+      await apiRequest(`/monitoring/check/${id}`, { method: 'POST' });
+      await reload();
+    } catch (err) {
+      alert(err.message);
+    } finally {
+      setCheckingId(null);
     }
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <h2 className="text-3xl font-bold text-slate-800 mb-8">System Overview</h2>
-      
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <MetricCard title="Total Apps Monitored" value="12" status="Active" color="text-green-500" />
-        <MetricCard title="Active Alerts" value="2" status="Needs Attention" color="text-red-500" />
-        <MetricCard title="System Uptime" value="99.9%" status="Last 30 days" color="text-slate-500" />
-      </div>
+    <section className="mx-auto max-w-7xl">
+      <PageHeader title="Applications" subtitle="Registered services and their monitoring configuration." />
+      <Notice loading={loading} error={error} />
+      <DataTable
+        columns={['Name', 'URL', 'Type', 'Interval', 'Status', '']}
+        rows={data.map((app) => [
+          app.name,
+          <span className="break-all text-slate-500">{app.url}</span>,
+          app.type || 'Web App',
+          `${app.monitoring_interval || 60}s`,
+          <StatusBadge status={app.status} />,
+          <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={!getToken() || checkingId === app.application_id} onClick={() => runCheck(app.application_id)}>
+            <PlayCircle size={16} />
+            {checkingId === app.application_id ? 'Checking' : 'Check'}
+          </button>,
+        ])}
+      />
+    </section>
+  );
+};
 
-      {/* Chart Section */}
-      <div className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 mt-8">
-        <h3 className="text-lg font-semibold mb-6">Global Response Times</h3>
-        <Line data={chartData} options={chartOptions} />
+const Alerts = () => {
+  const { data, setData, loading, error } = useApiData('/monitoring/alerts', demoAlerts);
+
+  const resolveAlert = async (alertId) => {
+    try {
+      await apiRequest(`/monitoring/alerts/${alertId}/resolve`, { method: 'PATCH' });
+      setData((alerts) => alerts.map((alert) => alert.alert_id === alertId ? { ...alert, status: 'RESOLVED' } : alert));
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <section className="mx-auto max-w-7xl">
+      <PageHeader title="Alert Management" subtitle="Availability incidents raised automatically by the monitoring job." />
+      <Notice loading={loading} error={error} />
+      <DataTable
+        columns={['Application', 'Severity', 'Status', 'Message', 'Created', '']}
+        rows={data.map((item) => [
+          item.application_name,
+          item.severity,
+          <StatusBadge status={item.status} />,
+          item.message,
+          formatDate(item.created_at),
+          item.status === 'OPEN' ? <button className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-100 disabled:opacity-60" disabled={!getToken()} onClick={() => resolveAlert(item.alert_id)}>Resolve</button> : '',
+        ])}
+      />
+    </section>
+  );
+};
+
+const Reports = () => {
+  const history = useApiData('/monitoring/history', demoHistory);
+  const logs = useApiData('/monitoring/logs', demoLogs);
+
+  return (
+    <section className="mx-auto max-w-7xl space-y-8">
+      <div>
+        <PageHeader title="System Reports" subtitle="Recent health checks and application logs for audit evidence." />
+        <Notice loading={history.loading || logs.loading} error={history.error || logs.error} />
       </div>
+      <div>
+        <h3 className="mb-3 font-semibold text-slate-950">Monitoring History</h3>
+        <DataTable
+          columns={['Application', 'Status', 'Response', 'Code', 'Checked']}
+          rows={history.data.map((row) => [
+            row.application_name,
+            <StatusBadge status={row.status} />,
+            `${row.response_time || 0} ms`,
+            row.status_code || '-',
+            formatDate(row.checked_at),
+          ])}
+        />
+      </div>
+      <div>
+        <h3 className="mb-3 font-semibold text-slate-950">Application Logs</h3>
+        <DataTable
+          columns={['Application', 'Level', 'Message', 'Created']}
+          rows={logs.data.map((row) => [
+            row.application_name,
+            row.log_level,
+            row.message,
+            formatDate(row.created_at),
+          ])}
+        />
+      </div>
+    </section>
+  );
+};
+
+const Login = () => {
+  const navigate = useNavigate();
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    try {
+      setLoading(true);
+      setError('');
+      const data = await apiRequest('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify(form),
+      });
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('user', JSON.stringify(data.user));
+      navigate('/');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="grid min-h-screen place-items-center bg-slate-50 p-5">
+      <form onSubmit={submit} className="w-full max-w-md rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-lg bg-blue-600 text-white"><Activity /></div>
+          <div>
+            <h1 className="text-xl font-bold">Sign in</h1>
+            <p className="text-sm text-slate-500">Use your admin account to manage monitoring.</p>
+          </div>
+        </div>
+        {error && <div className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        <div className="grid gap-4">
+          <input className="rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-600" type="email" placeholder="Email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} required />
+          <input className="rounded-lg border border-slate-300 px-4 py-3 outline-none focus:border-blue-600" type="password" placeholder="Password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} required />
+          <button className="rounded-lg bg-blue-600 px-4 py-3 font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={loading}>{loading ? 'Signing in' : 'Login'}</button>
+        </div>
+      </form>
     </div>
   );
 };
 
-const MetricCard = ({ title, value, status, color }) => (
-  <div className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 flex flex-col justify-between h-40">
-    <span className="text-slate-500 font-medium">{title}</span>
-    <span className="text-4xl font-bold text-slate-800">{value}</span>
-    <span className={`text-sm font-medium ${color}`}>{status}</span>
-  </div>
-);
-
-const Applications = () => (
-  <div className="max-w-6xl mx-auto">
-    <div className="flex justify-between items-center mb-8">
-      <h2 className="text-3xl font-bold">Applications</h2>
-      <button className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2.5 rounded-full font-medium transition-colors shadow-sm">
-        + Add App
-      </button>
-    </div>
-    <div className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-      <p className="text-slate-500">Application list will be rendered here...</p>
-    </div>
-  </div>
-);
-
-const Alerts = () => (
-  <div className="max-w-6xl mx-auto">
-    <h2 className="text-3xl font-bold mb-8">Alert Management</h2>
-    <div className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-      <p className="text-slate-500">Active alerts and notification rules will appear here...</p>
+const DataTable = ({ columns, rows }) => (
+  <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+    <div className="overflow-x-auto">
+      <table className="min-w-full divide-y divide-slate-200 text-sm">
+        <thead className="bg-slate-50">
+          <tr>{columns.map((column) => <th key={column} className="px-4 py-3 text-left font-semibold text-slate-600">{column}</th>)}</tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.length === 0 ? (
+            <tr><td className="px-4 py-6 text-center text-slate-500" colSpan={columns.length}>No records found.</td></tr>
+          ) : rows.map((row, index) => (
+            <tr key={index} className="hover:bg-slate-50">
+              {row.map((cell, cellIndex) => <td key={cellIndex} className="px-4 py-3 align-middle text-slate-700">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   </div>
 );
 
-const Reports = () => (
-  <div className="max-w-6xl mx-auto">
-    <h2 className="text-3xl font-bold mb-8">System Reports</h2>
-    <div className="bg-white rounded-3xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100">
-      <p className="text-slate-500">Historical data and export tools will appear here...</p>
-    </div>
-  </div>
-);
+const Notice = ({ loading, error }) => {
+  if (loading) return <div className="mb-4 rounded-lg bg-blue-50 p-3 text-sm text-blue-700">Loading live monitoring data...</div>;
+  if (error) return <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Showing demo data. Login and start the backend to load live data. Details: {error}</div>;
+  if (!getToken()) return <div className="mb-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">Showing demo data until you login.</div>;
+  return null;
+};
 
-const Login = () => (
-  <div className="h-screen w-full flex items-center justify-center bg-slate-50">
-    <div className="bg-white p-10 rounded-[2rem] shadow-[0_20px_60px_rgb(0,0,0,0.08)] border border-slate-100 w-full max-w-md">
-      <div className="flex justify-center mb-8 text-blue-600"><Activity size={48} /></div>
-      <h2 className="text-2xl font-bold text-center mb-8 text-slate-800">Sign In to AppMonitor</h2>
-      <div className="space-y-4">
-        <input type="email" placeholder="Email" className="w-full px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" />
-        <input type="password" placeholder="Password" className="w-full px-5 py-3 rounded-xl bg-slate-50 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all" />
-        <NavLink to="/" className="block w-full text-center bg-blue-500 hover:bg-blue-600 text-white py-3 rounded-xl font-semibold transition-colors mt-4">
-          Login
-        </NavLink>
-      </div>
-    </div>
-  </div>
-);
+const formatDate = (value) => {
+  if (!value) return '-';
+  return new Intl.DateTimeFormat('en', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+};
 
-// --- MAIN ROUTER ---
 export default function App() {
   return (
     <BrowserRouter>

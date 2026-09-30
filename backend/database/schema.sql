@@ -202,6 +202,28 @@ CREATE TABLE notifications (
 );
 
 
+-- 9. Monitoring History Table
+CREATE TABLE monitoring_history (
+
+    history_id SERIAL PRIMARY KEY,
+
+    application_id INTEGER NOT NULL,
+
+    status VARCHAR(20) NOT NULL,
+
+    response_time INTEGER,
+
+    status_code INTEGER,
+
+    checked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+
+    FOREIGN KEY(application_id)
+    REFERENCES applications(application_id)
+    ON DELETE CASCADE
+
+);
+
 
 -- ==========================================
 -- Indexes for Faster Searching

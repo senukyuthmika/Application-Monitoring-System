@@ -9,7 +9,7 @@ const createApplication = async (application) => {
     description,
     url,
     type,
-    monitoring_frequency,
+    monitoring_interval,
     owner_id
 } = application;
 
@@ -22,7 +22,7 @@ const createApplication = async (application) => {
             description,
             url,
             type,
-            monitoring_frequency,
+            monitoring_interval,
             owner_id
         )
 
@@ -35,7 +35,7 @@ const createApplication = async (application) => {
             description,
             url,
             type,
-            monitoring_frequency,
+            monitoring_interval,
             owner_id
         ]
     );
@@ -89,7 +89,7 @@ const updateApplication = async (id, application) => {
         description,
         url,
         type,
-        monitoring_frequency,
+        monitoring_interval,
         status
     } = application;
 
@@ -102,7 +102,7 @@ const updateApplication = async (id, application) => {
             description=$2,
             url=$3,
             type=$4,
-            monitoring_frequency=$5,
+            monitoring_interval=$5,
             status=$6
 
         WHERE application_id=$7
@@ -114,7 +114,7 @@ const updateApplication = async (id, application) => {
             description,
             url,
             type,
-            monitoring_frequency,
+            monitoring_interval,
             status,
             id
         ]
