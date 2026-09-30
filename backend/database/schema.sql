@@ -17,21 +17,24 @@ CREATE TABLE users (
 
 -- 2. Applications Table
 CREATE TABLE applications (
+
     application_id SERIAL PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
     description TEXT,
     url VARCHAR(255) NOT NULL,
     type VARCHAR(50),
-    monitoring_frequency INTEGER DEFAULT 60,
-    status VARCHAR(20) DEFAULT 'UNKNOWN',
+
+    monitoring_interval INTEGER DEFAULT 60,
+    status VARCHAR(20) DEFAULT 'ACTIVE',
+
     owner_id INTEGER,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_application_owner
     FOREIGN KEY(owner_id)
     REFERENCES users(user_id)
-    ON DELETE CASCADE
+    ON DELETE SET NULL
+
 );
 
 
