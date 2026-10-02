@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { Line } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Filler } from 'chart.js';
 import { Activity, Bell, CheckCircle2, FileText, LayoutDashboard, LogOut, PlayCircle, Plus, Server, ShieldAlert, Trash2, Users } from 'lucide-react';
@@ -124,7 +124,7 @@ const Layout = () => (
         <nav className="grid gap-1 sm:grid-cols-4 lg:grid-cols-1">
           <SidebarLink to="/" icon={<LayoutDashboard size={18} />} label="Dashboard" />
           <SidebarLink to="/applications" icon={<Server size={18} />} label="Applications" />
-          <SidebarLink to="/users" icon={<Users size={18} />} label="Users" />
+          {isAdmin() && <SidebarLink to="/users" icon={<Users size={18} />} label="Users" />}
           <SidebarLink to="/alerts" icon={<Bell size={18} />} label="Alerts" />
           <SidebarLink to="/reports" icon={<FileText size={18} />} label="Reports" />
         </nav>
@@ -289,7 +289,8 @@ const Applications = () => {
     <section className="mx-auto max-w-7xl space-y-6">
       <PageHeader title="Applications" subtitle="Registered services and their monitoring configuration." />
       <Notice loading={loading} error={error} />
-      <AdminPanel title="Add Application" lockedMessage="Login as ADMIN to create monitored applications.">
+      {isAdmin() && (
+      <AdminPanel title="Add Application">
         <form onSubmit={createApplication} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2">
           {formMessage && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700 lg:col-span-2">{formMessage}</div>}
           <FormInput label="Application Name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
@@ -320,6 +321,7 @@ const Applications = () => {
           </div>
         </form>
       </AdminPanel>
+      )}
       <DataTable
         columns={['Name', 'URL', 'Type', 'Interval', 'Status', 'Actions']}
         rows={data.map((app) => [
@@ -388,11 +390,15 @@ const UsersPage = () => {
     }
   };
 
+  if (!isAdmin()) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <section className="mx-auto max-w-7xl space-y-6">
       <PageHeader title="Users" subtitle="Create admin or normal user accounts for the monitoring system." />
       <Notice loading={loading} error={error} />
-      <AdminPanel title="Create User" lockedMessage="Login as ADMIN to create users.">
+      <AdminPanel title="Create User">
         <form onSubmit={createUser} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm lg:grid-cols-2">
           {formMessage && <div className="rounded-lg bg-blue-50 p-3 text-sm text-blue-700 lg:col-span-2">{formMessage}</div>}
           <FormInput label="Name" value={form.name} onChange={(value) => setForm({ ...form, name: value })} required />
@@ -564,23 +570,12 @@ const DataTable = ({ columns, rows }) => (
   </div>
 );
 
-const AdminPanel = ({ title, lockedMessage, children }) => {
-  if (!isAdmin()) {
-    return (
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-        <span className="font-semibold">{title}: </span>
-        {lockedMessage}
-      </div>
-    );
-  }
-
-  return (
+const AdminPanel = ({ title, children }) => (
     <div>
       <h3 className="mb-3 font-semibold text-slate-950">{title}</h3>
       {children}
     </div>
-  );
-};
+);
 
 const FormInput = ({ label, value, onChange, type = 'text', ...props }) => (
   <label className="grid gap-1 text-sm font-medium text-slate-700">
