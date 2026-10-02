@@ -20,7 +20,8 @@ cron.schedule("*/60 * * * * *", async () => {
             `
             SELECT *
             FROM applications
-            WHERE status = 'ACTIVE'
+            WHERE status IS NULL
+            OR status <> 'INACTIVE'
             `
         );
 

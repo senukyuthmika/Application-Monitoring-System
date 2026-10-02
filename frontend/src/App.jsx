@@ -334,7 +334,7 @@ const Applications = () => {
           app.name,
           <span className="break-all text-slate-500">{app.url}</span>,
           app.type || 'Web App',
-          `${app.monitoring_interval || 60}s`,
+          `${app.monitoring_interval || app.monitoring_frequency || 60}s`,
           <StatusBadge status={app.status} />,
           <div className="flex flex-wrap gap-2">
             <button className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60" disabled={!getToken() || checkingId === app.application_id} onClick={() => runCheck(app.application_id)}>
