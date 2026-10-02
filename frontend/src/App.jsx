@@ -56,7 +56,12 @@ const getUser = () => {
     return null;
   }
 };
-const isAdmin = () => getUser()?.role === 'ADMIN';
+const isLoggedIn = () => Boolean(getToken());
+const isAdmin = () => isLoggedIn() && getUser()?.role === 'ADMIN';
+const logout = () => {
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+};
 
 const apiRequest = async (path, options = {}) => {
   const token = getToken();
@@ -129,7 +134,7 @@ const Layout = () => (
           <SidebarLink to="/reports" icon={<FileText size={18} />} label="Reports" />
         </nav>
         <div className="mt-auto">
-          <SidebarLink to="/login" icon={<LogOut size={18} />} label="Login" />
+          <SidebarLink to="/login" icon={<LogOut size={18} />} label={isLoggedIn() ? 'Logout' : 'Login'} onClick={logout} />
         </div>
       </div>
     </aside>
@@ -139,9 +144,10 @@ const Layout = () => (
   </div>
 );
 
-const SidebarLink = ({ to, icon, label }) => (
+const SidebarLink = ({ to, icon, label, onClick }) => (
   <NavLink
     to={to}
+    onClick={onClick}
     className={({ isActive }) =>
       `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition ${
         isActive ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-950'
