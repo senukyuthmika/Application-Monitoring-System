@@ -134,6 +134,18 @@ const checkApplication = async (application) => {
 
         await client.query(
             `
+            UPDATE applications
+            SET status = $1
+            WHERE application_id = $2
+            `,
+            [
+                status,
+                application.application_id
+            ]
+        );
+
+        await client.query(
+            `
             INSERT INTO monitoring_results (
                 application_id,
                 status,

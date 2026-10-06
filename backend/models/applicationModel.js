@@ -1,5 +1,24 @@
 const pool = require("../config/db");
 
+const getMonitoringIntervalColumn = async () => {
+
+    const result = await pool.query(
+        `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'applications'
+        AND column_name IN ('monitoring_interval', 'monitoring_frequency')
+        ORDER BY CASE
+            WHEN column_name = 'monitoring_interval' THEN 1
+            ELSE 2
+        END
+        LIMIT 1
+        `
+    );
+
+    return result.rows[0]?.column_name || "monitoring_interval";
+
+};
 
 // Create Application
 const createApplication = async (application) => {
@@ -10,8 +29,13 @@ const createApplication = async (application) => {
     url,
     type,
     monitoring_interval,
+    monitoring_frequency,
+    status,
     owner_id
 } = application;
+
+    const intervalColumn = await getMonitoringIntervalColumn();
+    const intervalValue = monitoring_interval || monitoring_frequency || 60;
 
 
     const result = await pool.query(
@@ -22,11 +46,12 @@ const createApplication = async (application) => {
             description,
             url,
             type,
-            monitoring_interval,
+            ${intervalColumn},
+            status,
             owner_id
         )
 
-        VALUES($1,$2,$3,$4,$5,$6)
+        VALUES($1,$2,$3,$4,$5,$6,$7)
 
         RETURNING *
         `,
@@ -35,7 +60,8 @@ const createApplication = async (application) => {
             description,
             url,
             type,
-            monitoring_interval,
+            intervalValue,
+            status || "ACTIVE",
             owner_id
         ]
     );
@@ -90,8 +116,12 @@ const updateApplication = async (id, application) => {
         url,
         type,
         monitoring_interval,
+        monitoring_frequency,
         status
     } = application;
+
+    const intervalColumn = await getMonitoringIntervalColumn();
+    const intervalValue = monitoring_interval || monitoring_frequency || 60;
 
 
     const result = await pool.query(
@@ -102,7 +132,7 @@ const updateApplication = async (id, application) => {
             description=$2,
             url=$3,
             type=$4,
-            monitoring_interval=$5,
+            ${intervalColumn}=$5,
             status=$6
 
         WHERE application_id=$7
@@ -114,7 +144,7 @@ const updateApplication = async (id, application) => {
             description,
             url,
             type,
-            monitoring_interval,
+            intervalValue,
             status,
             id
         ]
